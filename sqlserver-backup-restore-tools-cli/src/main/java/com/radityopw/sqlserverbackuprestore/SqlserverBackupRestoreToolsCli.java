@@ -1,4 +1,4 @@
-package com.radityopw.app;
+package com.radityopw.sqlserverbackuprestore;
 
 import java.util.Scanner;
 import java.io.FileOutputStream;
@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.InputStream;
 import java.util.Properties;
+import com.zaxxer.hikari.*;
+import java.sql.*;
 
 /**
  * class SqlserverBackupRestoreToolsCli 
@@ -78,6 +80,9 @@ public class SqlserverBackupRestoreToolsCli
 		System.out.println("masukkan Database Name");
 		cwd.dbName = scanner.nextLine();
 		
+		System.out.println("masukkan Database Encrypt (true / false)");
+		cwd.dbEncrypt = scanner.nextLine();
+		
 		System.out.println("Config Terkait SSH");
 		System.out.println( "================================================" );
 		
@@ -113,6 +118,7 @@ class ConfigWizardData
 	public String dbUser;
 	public String dbPass;
 	public String dbName;
+	public String dbEncrypt;
 	
 	public String sshHost;
 	public String sshPort;
@@ -138,6 +144,7 @@ class ConfigWizardData
 			prop.setProperty("dbUser",dbUser);
 			prop.setProperty("dbPass",dbPass);
 			prop.setProperty("dbName",dbName);
+			prop.setProperty("dbEncrypt",dbEncrypt);
 			
 			
 			prop.setProperty("sshHost",sshHost);
@@ -184,6 +191,7 @@ class ConfigWizardData
 			dbUser = prop.getProperty("dbUser");
 			dbPass = prop.getProperty("dbPass");
 			dbName = prop.getProperty("dbName");
+			dbEncrypt = prop.getProperty("dbEncrypt");
 			
 			
 			sshHost = prop.getProperty("sshHost");
@@ -213,4 +221,53 @@ class ConfigWizardData
 		}
 	}
 	
+}
+
+
+class Database
+{
+	
+	private static Database instance;
+	
+	private HikariDataSource ds;
+	
+	private Database(ConfigWizardData cwd) throws Exception
+	{
+		
+		Class.forName("com.microsoft.sqlserver.jdbc.SQLServerDriver"); 
+		
+		HikariConfig config = new HikariConfig();
+		config.setJdbcUrl("jdbc:sqlserver://"+cwd.dbHost+":"+cwd.dbPort+";encrypt="+cwd.dbEncrypt+";databaseName="+cwd.dbName+";");
+		config.setUsername(cwd.dbUser);
+		config.setPassword(cwd.dbPass);
+		config.setMaximumPoolSize(50);
+		config.setMinimumIdle(10);
+		config.addDataSourceProperty("cachePrepStmts", "true");
+		config.addDataSourceProperty("prepStmtCacheSize", "250");
+		config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
+		
+		this.ds = new HikariDataSource(config);
+	}
+	
+	public static Database init(ConfigWizardData cwd) throws Exception
+	{
+		if ( instance == null )
+		{
+			instance = new Database(cwd);
+			
+		}
+		
+		return instance;
+	}
+	
+	public Connection getConnection() throws Exception
+	{
+		return this.ds.getConnection();
+	}
+	
+	public void close()
+	{
+		ds.close();
+		
+	}
 }
